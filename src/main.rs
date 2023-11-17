@@ -469,6 +469,7 @@ fn start_game() {
     let mut most_recent = 0;
     let screen_width;
     let screen_height;
+    let mut best_guessed = 0;
     if let Some((width, height)) = term_size::dimensions() {
         screen_width = width;
         screen_height = height - 6;
@@ -476,14 +477,14 @@ fn start_game() {
         screen_width = 80;
         screen_height = 34;
     }
-    println!("Ready! Enter a word to start. Similarity ranges from -100 (worst) to 100 (best). Type !quit to exit or !help for help.");
+    println!("Ready! Enter a word to start. Similarity ranges from -100 (worst) to 100 (best). Type !quit to exit, !hint for a hint, or !help for help.");
     loop {
         let line = rl.readline("semantle> ");
         if line.is_err() {
             exit(0);
         }
         let word = line.unwrap();
-        let word = word.trim().to_string();
+        let mut word = word.trim().to_string();
 
         if word == ***answer {
             println!("You found it in {guesses}! The word is {answer}.");
@@ -491,10 +492,16 @@ fn start_game() {
         }
 
         match word.as_str() {
-            "!quit" => exit(0),
+            "!quit" => {
+                println!("Goodbye! The word was {answer}.");
+                exit(0);
+            }
             "!help" => {
-                println!("Enter a word. You'll receive a number, which represents the semantic similarity between your word and the answer. -100 is the worst, 100 is the best. Type !quit to exit or !help to see this message again.");
+                println!("Enter a word. You'll receive a number, which represents the semantic similarity between your word and the answer. -100 is the worst, 100 is the best. Type !quit to exit, !hint to get a hint, or !help to see this message again.");
                 continue;
+            }
+            "!hint" => {
+                word = most_similar.get(1000-best_guessed-1).unwrap().0.to_string();
             }
             _ => {}
         }
@@ -556,6 +563,7 @@ fn start_game() {
         match (sim, index) {
             (_, 0..=999) => {
                 print!("{}/1000", 1000 - index);
+                best_guessed = best_guessed.max(1000-index);
             }
             (x, _) => {
                 if ***x >= 20. {
