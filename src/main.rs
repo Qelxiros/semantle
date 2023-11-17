@@ -21,20 +21,21 @@ use rustyline::config::Builder;
 use rustyline::history::MemHistory;
 use rustyline::Editor;
 
-struct Command<'a> {
-    command: &'a str,
-    usage: &'a str,
-    description: &'a str,
-    run: Box<
-        dyn Fn(
-            Box<Vec<&str>>,
+type Func<'a> = dyn Fn(
+            Vec<&str>,
             HashMap<&'a str, Vec<f32>>,
             HashMap<&'a str, Vec<f32>>,
             Vec<(String, f32)>,
             &'a str,
             Vec<Command>,
-        ) -> (Option<i32>, HashMap<&'a str, Vec<f32>>, Vec<(String, f32)>),
-    >,
+        ) -> (Option<i32>, HashMap<&'a str, Vec<f32>>, Vec<(String, f32)>);
+
+
+struct Command<'a> {
+    command: &'a str,
+    usage: &'a str,
+    description: &'a str,
+    run: Box<Func<'a>>,
 }
 
 fn main() {
@@ -94,8 +95,8 @@ fn start_solver() {
             continue;
         }
         let t = (*command).borrow().to_owned();
-        let terms = t.split(" ").collect::<Vec<_>>();
-        let command = terms.get(0).unwrap();
+        let terms = t.split(' ').collect::<Vec<_>>();
+        let command = terms.first().unwrap();
 
         let func = commands.get(command);
 
@@ -104,7 +105,7 @@ fn start_solver() {
             Some(x) => {
                 let exit_code;
                 (exit_code, words_to_vecs, log) = (x.run)(
-                    Box::new(terms.clone()),
+                    terms.clone(),
                     original_words.clone(),
                     words_to_vecs.clone(),
                     log.clone(),
@@ -125,13 +126,13 @@ fn init_commands() -> Vec<Command<'static>> {
             command: "w",
             usage: "w <word> <value|-r|value -e>",
             description: "Add a word with its similarity, edit an existing word's similarity, or remove a word",
-            run: Box::new(|params: Box<Vec<&str>>, original_words: HashMap<&str, Vec<f32>>, mut words_to_vecs: HashMap<&str, Vec<f32>>, mut log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
-                let mut params = params.into_iter().skip(1);
+            run: Box::new(|params: Vec<&str>, original_words: HashMap<&str, Vec<f32>>, mut words_to_vecs: HashMap<&str, Vec<f32>>, mut log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
+                let params = params.into_iter().skip(1);
                 let mut state = AddWordState::Normal;
                 let mut word_count = 0;
                 let mut word = None;
                 let mut val = None;
-                while let Some(term) = params.next() {
+                for term in params {
                     match term {
                         "-n" => state = AddWordState::Normal,
                         "-e" => state = AddWordState::Edit,
@@ -202,18 +203,18 @@ fn init_commands() -> Vec<Command<'static>> {
                             println!("Usage: {usage}");
                             return (None, words_to_vecs, log);
                         }
-                        log = log.into_iter().filter(|(a, _)| *a != word).collect();
+                        log.retain(|(a, _)| *a != word);
                         update_words(&original_words, &mut words_to_vecs, &log);
                     }
                 }
-                return (None, words_to_vecs, log);
+                (None, words_to_vecs, log)
             })
         },
         Command {
             command: "l",
             usage: "l [-d]",
             description: "List the guessed words with their similarities in human-readable or debug mode",
-            run: Box::new(|params: Box<Vec<&str>>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
+            run: Box::new(|params: Vec<&str>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
                 let mut params = params.into_iter().skip(1);
                 match params.next() {
                     None => {
@@ -221,21 +222,21 @@ fn init_commands() -> Vec<Command<'static>> {
                         log.iter().enumerate().for_each(|(i, (a, b))| {
                             println!("\t{}. `{}` with a similarity of `{}`", i + 1, a, b)
                         });
-                        return (None, words_to_vecs, log);
+                        (None, words_to_vecs, log)
                     }
                     Some("-d") => match params.next() {
                         None => {
                             println!("{:?}", log);
-                            return (None, words_to_vecs, log);
+                            (None, words_to_vecs, log)
                         }
                         Some(_) => {
                             println!("Usage: {usage}");
-                            return (None, words_to_vecs, log);
+                            (None, words_to_vecs, log)
                         }
                     },
                     Some(_) => {
                         println!("Usage: {usage}");
-                        return (None, words_to_vecs, log);
+                        (None, words_to_vecs, log)
                     }
                 }
             })
@@ -244,11 +245,11 @@ fn init_commands() -> Vec<Command<'static>> {
             command: "p",
             usage: "p",
             description: "View remaining possible words",
-            run: Box::new(|params: Box<Vec<&str>>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
-                let mut params = params.into_iter().skip(1);
+            run: Box::new(|params: Vec<&str>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
+                let params = params.into_iter().skip(1);
                 let mut debug_mode = false;
                 let mut show_embeddings = false;
-                while let Some(term) = params.next() {
+                for term in params {
                     match term {
                         "-d" => {
                             debug_mode = true;
@@ -275,44 +276,44 @@ fn init_commands() -> Vec<Command<'static>> {
                         words_to_vecs.keys().for_each(|k| println!("{}", k));
                     }
                 }
-                return (None, words_to_vecs, log);
+                (None, words_to_vecs, log)
             })
         },
         Command {
             command: "q",
             usage: "q",
             description: "Quit",
-            run: Box::new(|params: Box<Vec<&str>>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
+            run: Box::new(|params: Vec<&str>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
                 let mut params = params.into_iter().skip(1);
-                if let Some(_) = params.next() {
+                if params.next().is_some() {
                     println!("Usage: {usage}");
                     return (None, words_to_vecs, log);
                 }
-                return (Some(0), words_to_vecs, log);
+                (Some(0), words_to_vecs, log)
             })
         },
         Command {
             command: "h",
             usage: "h",
             description: "Display this help message",
-            run: Box::new(|params: Box<Vec<&str>>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, commands: Vec<Command>,| {
+            run: Box::new(|params: Vec<&str>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, commands: Vec<Command>,| {
                 let mut params = params.into_iter().skip(1);
-                if let Some(_) = params.next() {
+                if params.next().is_some() {
                     println!("Usage: {usage}");
                     return (None, words_to_vecs, log);
                 }
                 println!("Type one of the following commands:");
                 commands.iter().for_each(|a| { println!("\t{}", a.usage); println!("\t\t{}", a.description) });
-                return (None, words_to_vecs, log);
+                (None, words_to_vecs, log)
             })
         },
         Command {
             command: "fb",
             usage: "fb",
             description: "Find the best word according to current information",
-            run: Box::new(|params: Box<Vec<&str>>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
+            run: Box::new(|params: Vec<&str>, _original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
                 let mut params = params.into_iter().skip(1);
-                if let Some(_) = params.next() {
+                if params.next().is_some() {
                     println!("Usage: {usage}");
                     return (None, words_to_vecs, log);
                 }
@@ -326,8 +327,8 @@ fn init_commands() -> Vec<Command<'static>> {
                         (
                             a,
                             words_to_vecs
-                                .iter()
-                                .map(|(_, d)| (dot_product(b, d) * 10000.).round() as i32)
+                                .values()
+                                .map(|d| (dot_product(b, d) * 10000.).round() as i32)
                                 .unique()
                                 .count(),
                         )
@@ -337,24 +338,24 @@ fn init_commands() -> Vec<Command<'static>> {
                     "The optimal word based on your current information is {}",
                     best.0
                 );
-                return (None, words_to_vecs, log);
+                (None, words_to_vecs, log)
             })
         },
         Command {
             command: "c",
             usage: "c <length> <word> [-dr]",
             description: "List the <length> closest words to <word>, optionally in debug mode and/or in reverse",
-            run: Box::new(|params: Box<Vec<&str>>, original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
-                let mut params = params.into_iter().skip(1);
+            run: Box::new(|params: Vec<&str>, original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
+                let params = params.into_iter().skip(1);
                 let mut idx = 0;
                 let mut length = 0;
                 let mut word = "-";
                 let mut rev = false;
                 let mut debug = false;
-                while let Some(x) = params.next() {
-                    match (x, idx) {
+                for term in params {
+                    match (term, idx) {
                         (_,0) => {
-                            if let Ok(y) = x.parse::<usize>() {
+                            if let Ok(y) = term.parse::<usize>() {
                                 length = y;
                                 idx += 1;
                             } else {
@@ -421,7 +422,7 @@ fn init_commands() -> Vec<Command<'static>> {
                         println!("{:?}",top_n);
                     }
                 }
-                return (None, words_to_vecs, log);
+                (None, words_to_vecs, log)
             })
         },
     ]
@@ -467,14 +468,11 @@ fn start_game() {
     let _ = io::stdout().flush();
     let mut max_lens = (0, 0, 0, 0);
     let mut most_recent = 0;
-    let screen_width;
     let screen_height;
     let mut best_guessed = 0;
-    if let Some((width, height)) = term_size::dimensions() {
-        screen_width = width;
+    if let Some((_, height)) = term_size::dimensions() {
         screen_height = height - 6;
     } else {
-        screen_width = 80;
         screen_height = 34;
     }
     println!("Ready! Enter a word to start. Similarity ranges from -100 (worst) to 100 (best). Type !quit to exit, !hint for a hint, or !help for help.");
@@ -516,7 +514,7 @@ fn start_game() {
                 log.push((guesses, word.clone(), x.0, x.1));
                 most_recent = guesses;
             } else {
-                most_recent = log.iter().filter(|i| i.1 == word).next().unwrap().0;
+                most_recent = log.iter().find(|i| i.1 == word).unwrap().0;
             }
             print!("\x1B[2J\x1B[2;1H");
         } else {
@@ -530,7 +528,7 @@ fn start_game() {
             .iter()
             .filter(|i| i.0 != most_recent)
             .collect::<Vec<_>>();
-        temp_log.sort_by(|(_, _, a, _), (_, _, b, _)| (***a).total_cmp(**b).reverse());
+        temp_log.sort_by(|(_, _, a, _), (_, _, b, _)| (***a).total_cmp(b).reverse());
         let (guess, word, sim, index) = log.get(most_recent - 1).unwrap();
         let num_spaces_4;
         match (sim, index) {
@@ -590,9 +588,9 @@ fn start_game() {
                         }
                         (x, _) => {
                             if ***x >= 20. {
-                                format!("(tepid)")
+                                "(tepid)".to_string()
                             } else {
-                                format!("(cold)")
+                                "(cold)".to_string()
                             }
                         }
                     }
@@ -610,7 +608,7 @@ fn start_game() {
         }
         print!(
             "\x1B[{};1H",
-            if temp_log_formatted.len() == 0 { 5 } else { 6 }
+            if temp_log_formatted.is_empty() { 5 } else { 6 }
                 + (screen_height.min(temp_log_formatted.len()))
         );
         let _ = io::stdout().flush();
@@ -629,7 +627,7 @@ fn filter_embeddings(v1: &[f32], v2: &[f32], target_val: f32) -> bool {
 fn update_words<'a>(
     original_words: &HashMap<&'a str, Vec<f32>>,
     words_to_vecs: &mut HashMap<&'a str, Vec<f32>>,
-    log: &Vec<(String, f32)>,
+    log: &[(String, f32)],
 ) {
     *words_to_vecs = original_words.clone();
     for (word, val) in log.iter() {
@@ -654,7 +652,7 @@ fn print_column(
     height: usize,
 ) {
     let mut lines_above = lines_above;
-    if words.len() == 0 && column == 0 {
+    if words.is_empty() && column == 0 {
         lines_above -= 1;
     } else {
         print!(
