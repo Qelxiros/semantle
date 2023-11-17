@@ -121,7 +121,7 @@ fn start_solver() {
 }
 
 fn init_commands() -> Vec<Command<'static>> {
-    vec![
+    let mut commands = vec![
         Command {
             command: "w",
             usage: "w <word> <value|-r|value -e>",
@@ -389,7 +389,7 @@ fn init_commands() -> Vec<Command<'static>> {
                     return (None, words_to_vecs, log);
                 }
                 let sim = sim.unwrap();
-                let mut orig_words_sorted = original_words
+                let mut orig_words_by_word = original_words
                     .iter()
                     .filter(|(a,_)| **a != word)
                     .map(|(a, b)| {
@@ -398,34 +398,81 @@ fn init_commands() -> Vec<Command<'static>> {
                             dot_product(b, sim),
                         )
                     }).collect::<Vec<_>>();
-                orig_words_sorted.sort_by(|(_,a),(_,b)| a.total_cmp(b));
-                orig_words_sorted.reverse();
+                orig_words_by_word.sort_by(|(_,a),(_,b)| a.total_cmp(b));
+                orig_words_by_word.reverse();
                 match (debug, rev) {
                     (false, false) => {
-                        let top_n = orig_words_sorted.iter().take(length);
+                        let top_n = orig_words_by_word.iter().take(length);
                         let spaces1 = (length+1).to_string().len();
-                        let spaces2 = orig_words_sorted.iter().fold(("", 0), |a, b| (b.0, a.1.max(b.0.chars().count()))).1;
+                        let spaces2 = orig_words_by_word.iter().fold(("", 0), |a, b| (b.0, a.1.max(b.0.chars().count()))).1;
                         top_n.enumerate().for_each(|(index, (word, sim))| println!("{}{}{word}{}{sim}", index+1, " ".repeat(spaces1 - (index+1).to_string().len() + 1), " ".repeat(spaces2 - word.chars().count() + 1)));
                     }
                     (false, true) => {
-                        let top_n = orig_words_sorted.iter().take(length).rev();
+                        let top_n = orig_words_by_word.iter().take(length).rev();
                         let spaces1 = (length+1).to_string().len();
-                        let spaces2 = orig_words_sorted.iter().fold(("", 0), |a, b| (b.0, a.1.max(b.0.len()))).1;
+                        let spaces2 = orig_words_by_word.iter().fold(("", 0), |a, b| (b.0, a.1.max(b.0.len()))).1;
                         top_n.enumerate().for_each(|(index, (word, sim))| println!("{}{}{word}{}{sim}", length-index, " ".repeat(spaces1 - (length-index).to_string().len() + 1), " ".repeat(spaces2 - word.chars().count() + 1)));
                     }
                     (true, false) => {
-                        let top_n = orig_words_sorted.iter().take(length).collect::<Vec<_>>();
+                        let top_n = orig_words_by_word.iter().take(length).collect::<Vec<_>>();
                         println!("{:?}",top_n);
                     }
                     (true, true) => {
-                        let top_n = orig_words_sorted.iter().take(length).rev().collect::<Vec<_>>();
+                        let top_n = orig_words_by_word.iter().take(length).rev().collect::<Vec<_>>();
                         println!("{:?}",top_n);
                     }
                 }
                 (None, words_to_vecs, log)
             })
         },
-    ]
+        Command {
+            command: "r",
+            usage: "r <original> <query>",
+            description: "Provide the rank of <query> out of all words when sorted according to similarity to <original>",
+            run: Box::new(|params: Vec<&str>, original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
+                let mut params = params.into_iter().skip(1);
+                let original;
+                let query;
+                let sim;
+                if let Some(x) = params.next() {
+                    original = x;
+                } else {
+                    println!("Usage: {usage}");
+                    return (None, words_to_vecs, log);
+                }
+                if let Some(y) = params.next() {
+                    query = y;
+                } else {
+                    println!("Usage: {usage}");
+                    return (None, words_to_vecs, log);
+                }
+                if let Some(z) = original_words.get(original) {
+                    sim = z;
+                } else {
+                    println!("Unknown word {original}");
+                    return (None, words_to_vecs, log);
+                }
+                let mut orig_words_by_word = original_words
+                    .iter()
+                    .filter(|(a,_)| **a != original)
+                    .map(|(a, b)| {
+                        (
+                            a,
+                            dot_product(b, sim),
+                        )
+                    }).collect::<Vec<_>>();
+                orig_words_by_word.sort_by(|(_,a),(_,b)| b.total_cmp(a));
+                if let Some(rank) = orig_words_by_word.iter().position(|(a,_)| **a == query) {
+                    println!("{}",rank+1);
+                } else {
+                    println!("Unknown word {query}");
+                }
+                (None, words_to_vecs, log)
+            })
+        },
+    ];
+    commands.sort_by(|a,b| a.command.cmp(b.command));
+    commands
 }
 
 fn start_game() {
