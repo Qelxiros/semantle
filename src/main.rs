@@ -485,6 +485,7 @@ fn start_game() {
         let mut word = word.trim().to_string();
 
         if word == ***answer {
+            guesses += 1;
             println!("You found it in {guesses}! The word is {answer}.");
             exit(0);
         }
