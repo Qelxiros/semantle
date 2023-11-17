@@ -339,7 +339,91 @@ fn init_commands() -> Vec<Command<'static>> {
                 );
                 return (None, words_to_vecs, log);
             })
-        }
+        },
+        Command {
+            command: "c",
+            usage: "c <length> <word> [-dr]",
+            description: "List the <length> closest words to <word>, optionally in debug mode and/or in reverse",
+            run: Box::new(|params: Box<Vec<&str>>, original_words: HashMap<&str, Vec<f32>>, words_to_vecs: HashMap<&str, Vec<f32>>, log: Vec<(String, f32)>, usage: &str, _: Vec<Command>,| {
+                let mut params = params.into_iter().skip(1);
+                let mut idx = 0;
+                let mut length = 0;
+                let mut word = "-";
+                let mut rev = false;
+                let mut debug = false;
+                while let Some(x) = params.next() {
+                    match (x, idx) {
+                        (_,0) => {
+                            if let Ok(y) = x.parse::<usize>() {
+                                length = y;
+                                idx += 1;
+                            } else {
+                                println!("Usage: {usage}");
+                                return (None, words_to_vecs, log);
+                            }
+                        }
+                        (y,1) => {
+                            word = y;
+                            idx += 1;
+                        }
+                        ("-d",_) => {
+                            debug = !debug;
+                        }
+                        ("-r",_) => {
+                            rev = !rev;
+                        }
+                        _ => {
+                            println!("Usage: {usage}");
+                            return (None, words_to_vecs, log);
+                        }
+                    }
+                }
+                if idx < 2 {
+                    println!("Usage: {usage}");
+                    return (None, words_to_vecs, log);
+                }
+                let sim = original_words.get(word);
+                if sim.is_none() {
+                    println!("Unknown word {word}");
+                    return (None, words_to_vecs, log);
+                }
+                let sim = sim.unwrap();
+                let mut orig_words_sorted = original_words
+                    .iter()
+                    .filter(|(a,_)| **a != word)
+                    .map(|(a, b)| {
+                        (
+                            a,
+                            dot_product(b, sim),
+                        )
+                    }).collect::<Vec<_>>();
+                orig_words_sorted.sort_by(|(_,a),(_,b)| a.total_cmp(b));
+                orig_words_sorted.reverse();
+                match (debug, rev) {
+                    (false, false) => {
+                        let top_n = orig_words_sorted.iter().take(length);
+                        let spaces1 = (length+1).to_string().len();
+                        let spaces2 = orig_words_sorted.iter().fold(("", 0), |a, b| (b.0, a.1.max(b.0.chars().count()))).1;
+                        top_n.enumerate().for_each(|(index, (word, sim))| println!("{}{}{word}{}{sim}", index+1, " ".repeat(spaces1 - (index+1).to_string().len() + 1), " ".repeat(spaces2 - word.chars().count() + 1)));
+                    }
+                    (false, true) => {
+                        let top_n = orig_words_sorted.iter().take(length).rev();
+                        let spaces1 = (length+1).to_string().len();
+                        let spaces2 = orig_words_sorted.iter().fold(("", 0), |a, b| (b.0, a.1.max(b.0.len()))).1;
+                        top_n.enumerate().for_each(|(index, (word, sim))| println!("{}{}{word}{}{sim}", length-index, " ".repeat(spaces1 - (length-index).to_string().len() + 1), " ".repeat(spaces2 - word.chars().count() + 1)));
+                    }
+                    (true, false) => {
+                        let top_n = orig_words_sorted.iter().take(length).collect::<Vec<_>>();
+                        println!("{:?}",top_n);
+                    }
+                    (true, true) => {
+                        let top_n = orig_words_sorted.iter().take(length).rev().collect::<Vec<_>>();
+                        println!("{:?}",top_n);
+                    }
+                }
+                return (None, words_to_vecs, log);
+            })
+        },
     ]
 }
 
@@ -417,7 +501,7 @@ fn start_game() {
 
         if let Some(x) = similarities.get(&&&word.as_str()) {
             if guessed.insert(word.clone()) {
-                max_lens.1 = max_lens.1.max(word.len());
+                max_lens.1 = max_lens.1.max(word.chars().count());
                 guesses += 1;
                 max_lens.0 = max_lens.0.max(guesses.to_string().len());
                 if **x.0 == 100. {}
@@ -464,7 +548,7 @@ fn start_game() {
         let num_spaces_1 = max_lens.0 - guess.to_string().len() + 1;
         print!("{}", " ".repeat(num_spaces_1));
         print!("{word}");
-        let num_spaces_2 = max_lens.1 - word.len() + 1;
+        let num_spaces_2 = max_lens.1 - word.chars().count() + 1;
         print!("{}", " ".repeat(num_spaces_2));
         print!("{sim}");
         let num_spaces_3 = max_lens.2 - sim.to_string().len() + 1;
@@ -516,7 +600,11 @@ fn start_game() {
             };
             print_column(words, width, i, 3, i == columns - 1, screen_height);
         }
-        print!("\x1B[{};1H", if temp_log_formatted.len() == 0 {5} else {6}+(screen_height.min(temp_log_formatted.len())));
+        print!(
+            "\x1B[{};1H",
+            if temp_log_formatted.len() == 0 { 5 } else { 6 }
+                + (screen_height.min(temp_log_formatted.len()))
+        );
         let _ = io::stdout().flush();
     }
 }
@@ -573,7 +661,12 @@ fn print_column(
                     "─".repeat(width)
                 )
             } else {
-                format!("\x1B[{};{}H┬{}", lines_above + 1, column*width + 2, "─".repeat(width))
+                format!(
+                    "\x1B[{};{}H┬{}",
+                    lines_above + 1,
+                    column * width + 2,
+                    "─".repeat(width)
+                )
             },
             if last_column && column == 0 {
                 "┤"
@@ -587,7 +680,7 @@ fn print_column(
             print!(
                 "\x1B[{};{}H│ {} {}",
                 index + 2 + lines_above,
-                if column == 0 {1} else {column * width + 2},
+                if column == 0 { 1 } else { column * width + 2 },
                 word,
                 if last_column { "│" } else { "" }
             );
@@ -597,10 +690,14 @@ fn print_column(
                 print!(
                     "\x1B[{};{}H│",
                     i + 2 + lines_above,
-                    if column == 0 {1} else {column * width + 2},
+                    if column == 0 { 1 } else { column * width + 2 },
                 );
             }
-        print!("\x1B[{};{}H┘",height+2+lines_above,if column == 0 {1} else {column * width + 2},);
+            print!(
+                "\x1B[{};{}H┘",
+                height + 2 + lines_above,
+                if column == 0 { 1 } else { column * width + 2 },
+            );
         }
     }
     print!(
@@ -645,7 +742,7 @@ fn format_string(
         index,
         " ".repeat(1 + widths.0 - index.to_string().len()),
         s,
-        " ".repeat(1 + widths.1 - s.len()),
+        " ".repeat(1 + widths.1 - s.chars().count()),
         sim,
         " ".repeat(1 + widths.2 - sim.to_string().len()),
         ranking,
