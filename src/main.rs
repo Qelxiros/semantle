@@ -585,12 +585,21 @@ fn start_game() {
                 num_spaces_4 = max_lens.3 - (5 + (1000 - index).to_string().len())
             }
             (x, _) => {
-                if ***x >= 20. {
+                if ***x >= 40. {
+                    max_lens.3 = max_lens.3.max(10);
+                    num_spaces_4 = max_lens.3 - 10;
+                } else if ***x >= 30. {
+                    max_lens.3 = max_lens.3.max(8);
+                    num_spaces_4 = max_lens.3 - 8;
+                } else if ***x >= 20. {
                     max_lens.3 = max_lens.3.max(7);
                     num_spaces_4 = max_lens.3 - 7;
-                } else {
+                } else if ***x >= 0. {
                     max_lens.3 = max_lens.3.max(6);
                     num_spaces_4 = max_lens.3 - 6;
+                } else {
+                    max_lens.3 = max_lens.3.max(8);
+                    num_spaces_4 = max_lens.3 - 8;
                 }
             }
         }
@@ -612,10 +621,16 @@ fn start_game() {
                 best_guessed = best_guessed.max(1000-index);
             }
             (x, _) => {
-                if ***x >= 20. {
+                if ***x >= 40. {
+                    print!("(scalding)");
+                } else if ***x >= 30. {
+                    print!("(toasty)");
+                } else if ***x >= 20. {
                     print!("(tepid)");
-                } else {
+                } else if ***x >= 0. {
                     print!("(cold)");
+                } else {
+                    print!("(frigid)");
                 }
             }
         }
@@ -635,10 +650,16 @@ fn start_game() {
                             format!("{}/1000", 1000 - index)
                         }
                         (x, _) => {
-                            if ***x >= 20. {
+                            if ***x >= 40. {
+                                "(scalding)".to_string()
+                            } else if ***x >= 30. {
+                                "(toasty)".to_string()
+                            } else if ***x >= 20. {
                                 "(tepid)".to_string()
-                            } else {
+                            } else if ***x >= 0. {
                                 "(cold)".to_string()
+                            } else {
+                                "(frigid)".to_string()
                             }
                         }
                     }
