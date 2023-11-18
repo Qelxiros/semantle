@@ -477,6 +477,7 @@ fn init_commands() -> Vec<Command<'static>> {
 
 fn start_game() {
     println!("Loading...");
+    let color_end = "\x1B[37m";
     let mut reader = BufReader::new(File::open("./words.bin").unwrap());
 
     let embeddings: Embeddings<SimpleVocab, StorageViewWrap> =
@@ -579,34 +580,41 @@ fn start_game() {
         temp_log.sort_by(|(_, _, a, _), (_, _, b, _)| (***a).total_cmp(b).reverse());
         let (guess, word, sim, index) = log.get(most_recent - 1).unwrap();
         let num_spaces_4;
+        let mut prefix;
         match (sim, index) {
             (_, 0..=999) => {
                 max_lens.3 = max_lens.3.max(5 + (1000 - index).to_string().len());
-                num_spaces_4 = max_lens.3 - (5 + (1000 - index).to_string().len())
+                num_spaces_4 = max_lens.3 - (5 + (1000 - index).to_string().len());
+                prefix = "\x1B[37m";
             }
             (x, _) => {
                 if ***x >= 40. {
                     max_lens.3 = max_lens.3.max(10);
                     num_spaces_4 = max_lens.3 - 10;
+                    prefix = "\x1B[33m";
                 } else if ***x >= 30. {
                     max_lens.3 = max_lens.3.max(8);
                     num_spaces_4 = max_lens.3 - 8;
+                    prefix = "\x1B[31m";
                 } else if ***x >= 20. {
                     max_lens.3 = max_lens.3.max(7);
                     num_spaces_4 = max_lens.3 - 7;
+                    prefix = "\x1B[31m";
                 } else if ***x >= 0. {
                     max_lens.3 = max_lens.3.max(6);
                     num_spaces_4 = max_lens.3 - 6;
+                    prefix = "\x1B[36m";
                 } else {
                     max_lens.3 = max_lens.3.max(8);
                     num_spaces_4 = max_lens.3 - 8;
+                    prefix = "\x1B[34m";
                 }
             }
         }
         let width = max_lens.0 + max_lens.1 + max_lens.2 + max_lens.3 + 5;
         println!("┌{}┐", "─".repeat(width));
         print!("│ ");
-        print!("{guess}");
+        print!("{prefix}{guess}");
         let num_spaces_1 = max_lens.0 - guess.to_string().len() + 1;
         print!("{}", " ".repeat(num_spaces_1));
         print!("{word}");
@@ -634,7 +642,7 @@ fn start_game() {
                 }
             }
         }
-        print!("{} │", " ".repeat(num_spaces_4));
+        print!("{}{color_end} │", " ".repeat(num_spaces_4));
 
         let columns = 1.max((temp_log.len() + screen_height - 1) / screen_height);
         let temp_log_formatted = temp_log
@@ -647,23 +655,28 @@ fn start_game() {
                     ***sim,
                     match (sim, index) {
                         (_, 0..=999) => {
-                            format!("{}/1000", 1000 - index)
+                            ("\x1B[37m",
+                            format!("{}/1000", 1000 - index))
                         }
                         (x, _) => {
                             if ***x >= 40. {
-                                "(scalding)".to_string()
+                                ("\x1B[33m",
+                                "(scalding)".to_string())
                             } else if ***x >= 30. {
-                                "(toasty)".to_string()
+                                ("\x1B[31m",
+                                "(toasty)".to_string())
                             } else if ***x >= 20. {
-                                "(tepid)".to_string()
+                                ("\x1B[31m",
+                                "(tepid)".to_string())
                             } else if ***x >= 0. {
-                                "(cold)".to_string()
+                                ("\x1B[36m",
+                                "(cold)".to_string())
                             } else {
-                                "(frigid)".to_string()
+                                ("\x1B[34m",
+                                "(frigid)".to_string())
                             }
                         }
-                    }
-                    .as_str(),
+                    },
                 )
             })
             .collect::<Vec<_>>();
@@ -721,6 +734,7 @@ fn print_column(
     height: usize,
 ) {
     let mut lines_above = lines_above;
+    let offset = if column >= 1 { 1 } else { 0 };
     if words.is_empty() && column == 0 {
         lines_above -= 1;
     } else {
@@ -732,14 +746,14 @@ fn print_column(
                 format!(
                     "\x1B[{};{}H┼{}",
                     lines_above + 1,
-                    column * width + 2,
+                    column * (width + offset) + 1,
                     "─".repeat(width)
                 )
             } else {
                 format!(
                     "\x1B[{};{}H┬{}",
                     lines_above + 1,
-                    column * width + 2,
+                    column * (width + offset) + 1,
                     "─".repeat(width)
                 )
             },
@@ -755,7 +769,7 @@ fn print_column(
             print!(
                 "\x1B[{};{}H│ {} {}",
                 index + 2 + lines_above,
-                if column == 0 { 1 } else { column * width + 2 },
+                if column == 0 { 1 } else { column * (width + offset) + 1 },
                 word,
                 if last_column { "│" } else { "" }
             );
@@ -765,13 +779,13 @@ fn print_column(
                 print!(
                     "\x1B[{};{}H│",
                     i + 2 + lines_above,
-                    if column == 0 { 1 } else { column * width + 2 },
+                    if column == 0 { 1 } else { column * (width + offset) + 1 },
                 );
             }
             print!(
                 "\x1B[{};{}H┘",
                 height + 2 + lines_above,
-                if column == 0 { 1 } else { column * width + 2 },
+                if column == 0 { 1 } else { column * (width + offset) + 1 },
             );
         }
     }
@@ -787,14 +801,14 @@ fn print_column(
             format!(
                 "\x1B[{};{}H├{}",
                 words.len() + lines_above + 2,
-                column * width + 2,
+                column * (width + offset) + 1,
                 "─".repeat(width)
             )
         } else {
             format!(
                 "\x1B[{};{}H┴{}",
                 words.len() + lines_above + 2,
-                column * width + 2,
+                column * (width + offset) + 1,
                 "─".repeat(width)
             )
         },
@@ -810,17 +824,18 @@ fn format_string(
     index: usize,
     widths: (usize, usize, usize, usize),
     sim: f32,
-    ranking: &str,
+    prefix_ranking: (&str, String),
 ) -> String {
     format!(
-        "{}{}{}{}{}{}{}{}",
+        "{}{}{}{}{}{}{}{}{}\x1B[37m",
+        prefix_ranking.0,
         index,
         " ".repeat(1 + widths.0 - index.to_string().len()),
         s,
         " ".repeat(1 + widths.1 - s.chars().count()),
         sim,
         " ".repeat(1 + widths.2 - sim.to_string().len()),
-        ranking,
-        " ".repeat(widths.3 - ranking.len())
+        prefix_ranking.1,
+        " ".repeat(widths.3 - prefix_ranking.1.len())
     )
 }
