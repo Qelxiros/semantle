@@ -580,7 +580,7 @@ fn start_game() {
         temp_log.sort_by(|(_, _, a, _), (_, _, b, _)| (***a).total_cmp(b).reverse());
         let (guess, word, sim, index) = log.get(most_recent - 1).unwrap();
         let num_spaces_4;
-        let mut prefix;
+        let prefix;
         match (sim, index) {
             (_, 0..=999) => {
                 max_lens.3 = max_lens.3.max(5 + (1000 - index).to_string().len());
