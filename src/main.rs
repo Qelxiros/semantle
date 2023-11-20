@@ -22,14 +22,13 @@ use rustyline::history::MemHistory;
 use rustyline::Editor;
 
 type Func<'a> = dyn Fn(
-            Vec<&str>,
-            HashMap<&'a str, Vec<f32>>,
-            HashMap<&'a str, Vec<f32>>,
-            Vec<(String, f32)>,
-            &'a str,
-            Vec<Command>,
-        ) -> (Option<i32>, HashMap<&'a str, Vec<f32>>, Vec<(String, f32)>);
-
+    Vec<&str>,
+    HashMap<&'a str, Vec<f32>>,
+    HashMap<&'a str, Vec<f32>>,
+    Vec<(String, f32)>,
+    &'a str,
+    Vec<Command>,
+) -> (Option<i32>, HashMap<&'a str, Vec<f32>>, Vec<(String, f32)>);
 
 struct Command<'a> {
     command: &'a str,
@@ -42,21 +41,25 @@ fn main() {
     let args = env::args().collect::<Vec<_>>();
     match args.len() {
         0 => println!("Invalid mode"),
-        1 => println!("Usage: {} <solve|play>", args.get(0).unwrap()),
+        1 => println!("Usage: {} <solve [--clear]|play>", args.get(0).unwrap()),
         2 => {
             let path = args.get(0).unwrap();
             let mode = args.get(1).unwrap();
             match mode.as_str() {
-                "solve" => start_solver(),
+                "solve" => start_solver(false),
                 "play" => start_game(),
                 _ => println!("Usage: {} <solve|play>", path),
             }
+        }
+        3 => {
+            if args.get(1).unwrap() != "solve" && args.get(2).unwrap() != "--clear" { println!("Usage: {} <solve|play>", args.get(0).unwrap()); }
+            else { start_solver(true); }
         }
         _ => println!("Usage: {} <solve|play>", args.get(0).unwrap()),
     }
 }
 
-fn start_solver() {
+fn start_solver(clear: bool) {
     println!("Loading...");
     let mut reader = BufReader::new(File::open("./words.bin").unwrap());
 
@@ -78,12 +81,12 @@ fn start_solver() {
     for c in command_vec.iter() {
         commands.insert(c.command, c);
     }
-    print!("\x1B[2J\x1B[1;1H");
+    if clear { print!("\x1B[2J\x1B[1;1H"); }
     let _ = io::stdout().flush();
     println!("Ready! Type a valid command or type h for help.");
     loop {
         let line = rl.readline("semantle> ");
-        print!("\x1B[2J\x1B[1;1H");
+        if clear { print!("\x1B[2J\x1B[1;1H"); }
         let _ = io::stdout().flush();
         if line.is_err() {
             exit(0);
@@ -471,7 +474,7 @@ fn init_commands() -> Vec<Command<'static>> {
             })
         },
     ];
-    commands.sort_by(|a,b| a.command.cmp(b.command));
+    commands.sort_by(|a, b| a.command.cmp(b.command));
     commands
 }
 
@@ -548,7 +551,11 @@ fn start_game() {
                 continue;
             }
             "!hint" => {
-                word = most_similar.get(1000-best_guessed-1).unwrap().0.to_string();
+                word = most_similar
+                    .get(1000 - best_guessed - 1)
+                    .unwrap()
+                    .0
+                    .to_string();
             }
             _ => {}
         }
@@ -626,7 +633,7 @@ fn start_game() {
         match (sim, index) {
             (_, 0..=999) => {
                 print!("{}/1000", 1000 - index);
-                best_guessed = best_guessed.max(1000-index);
+                best_guessed = best_guessed.max(1000 - index);
             }
             (x, _) => {
                 if ***x >= 40. {
@@ -654,26 +661,18 @@ fn start_game() {
                     max_lens,
                     ***sim,
                     match (sim, index) {
-                        (_, 0..=999) => {
-                            ("\x1B[37m",
-                            format!("{}/1000", 1000 - index))
-                        }
+                        (_, 0..=999) => ("\x1B[37m", format!("{}/1000", 1000 - index)),
                         (x, _) => {
                             if ***x >= 40. {
-                                ("\x1B[33m",
-                                "(scalding)".to_string())
+                                ("\x1B[33m", "(scalding)".to_string())
                             } else if ***x >= 30. {
-                                ("\x1B[31m",
-                                "(toasty)".to_string())
+                                ("\x1B[31m", "(toasty)".to_string())
                             } else if ***x >= 20. {
-                                ("\x1B[31m",
-                                "(tepid)".to_string())
+                                ("\x1B[31m", "(tepid)".to_string())
                             } else if ***x >= 0. {
-                                ("\x1B[36m",
-                                "(cold)".to_string())
+                                ("\x1B[36m", "(cold)".to_string())
                             } else {
-                                ("\x1B[34m",
-                                "(frigid)".to_string())
+                                ("\x1B[34m", "(frigid)".to_string())
                             }
                         }
                     },
@@ -769,7 +768,11 @@ fn print_column(
             print!(
                 "\x1B[{};{}H│ {} {}",
                 index + 2 + lines_above,
-                if column == 0 { 1 } else { column * (width + offset) + 1 },
+                if column == 0 {
+                    1
+                } else {
+                    column * (width + offset) + 1
+                },
                 word,
                 if last_column { "│" } else { "" }
             );
@@ -779,13 +782,21 @@ fn print_column(
                 print!(
                     "\x1B[{};{}H│",
                     i + 2 + lines_above,
-                    if column == 0 { 1 } else { column * (width + offset) + 1 },
+                    if column == 0 {
+                        1
+                    } else {
+                        column * (width + offset) + 1
+                    },
                 );
             }
             print!(
                 "\x1B[{};{}H┘",
                 height + 2 + lines_above,
-                if column == 0 { 1 } else { column * (width + offset) + 1 },
+                if column == 0 {
+                    1
+                } else {
+                    column * (width + offset) + 1
+                },
             );
         }
     }
